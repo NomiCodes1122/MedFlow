@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ApiResponse } from '../common/http/ApiResponse.js';
 import { authRouter } from '../modules/auth/index.js';
+import { patientRouter } from '../modules/patients/index.js';
 
 export const apiV1Router = Router();
 
@@ -19,4 +20,8 @@ apiV1Router.get('/', (_req: Request, res: Response) => {
 
 // Authentication & Session Routes (Phase 5)
 apiV1Router.use('/auth', authRouter);
+
+// Patient Domain Routes (Phase 6)
+apiV1Router.use('/patients', patientRouter);
+
 

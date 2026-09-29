@@ -40,8 +40,8 @@ export class ApiError extends Error {
     return new ApiError(404, ErrorCodes.NOT_FOUND, message);
   }
 
-  static conflict(message = 'Resource conflict'): ApiError {
-    return new ApiError(409, ErrorCodes.CONFLICT, message);
+  static conflict(message = 'Resource conflict', details?: unknown): ApiError {
+    return new ApiError(409, ErrorCodes.CONFLICT, message, details);
   }
 
   static rateLimited(message = 'Too many requests, please try again later'): ApiError {
