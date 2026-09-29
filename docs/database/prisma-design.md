@@ -1,0 +1,638 @@
+# MedFlow Prisma ORM Conceptual Schema Specification
+
+This document provides the complete Prisma Schema specification (`schema.prisma`) mapping all **18 models** and enums for Supabase PostgreSQL.
+
+---
+
+## 1. Datasource & Generator Configuration
+
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Supabase pooled connection for application runtime
+  directUrl = env("DIRECT_URL")   // Direct connection for Prisma CLI migrations & session commands
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+```
+
+*Connection Architecture Note*:
+- Application runtime queries use pooled/transaction connections configured with Prisma pooling parameters (e.g. `?pgbouncer=true`).
+- Prisma CLI operations (migrations, introspections) require direct session continuity and use the direct database connection string.
+- Exact connection strings are obtained from the Supabase Connect dashboard.
+
+---
+
+## 2. Enums Definition
+
+```prisma
+enum UserRole {
+  PARAMEDIC
+  TRIAGE_DOCTOR
+  HOSPITAL_SUPERINTENDENT
+
+  @@map("enum_user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+
+  @@map("enum_user_status")
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+
+  @@map("enum_device_platform")
+}
+
+enum IncidentStatus {
+  REPORTED
+  ACTIVE
+  TRIAGE_ACTIVE
+  RESOLVED
+  CLOSED
+
+  @@map("enum_incident_status")
+}
+
+enum IncidentPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+
+  @@map("enum_incident_priority")
+}
+
+enum NotificationPriority {
+  CRITICAL
+  MODERATE
+  LOW
+
+  @@map("enum_notification_priority")
+}
+
+enum AmbulanceStatus {
+  AVAILABLE
+  DISPATCHED
+  ON_SCENE
+  TRANSPORTING
+  OUT_OF_SERVICE
+
+  @@map("enum_ambulance_status")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+
+  @@map("enum_gender")
+}
+
+enum PatientStatus {
+  FIELD_INTAKE
+  IN_TRANSIT
+  ARRIVED_ER
+  ADMITTED
+  DISCHARGED
+  DECEASED
+
+  @@map("enum_patient_status")
+}
+
+enum TriageCategory {
+  RED
+  YELLOW
+  GREEN
+  BLACK
+  UNASSESSED
+
+  @@map("enum_triage_category")
+}
+
+enum TriageSource {
+  FIELD_START
+  ER_TRIAGE_REASSESSMENT
+
+  @@map("enum_triage_source")
+}
+
+enum VitalSource {
+  PARAMEDIC_FIELD
+  MONITOR_DEVICE
+  DOCTOR_ER
+  OFFLINE_SYNC
+
+  @@map("enum_vital_source")
+}
+
+enum MediaType {
+  PHOTO
+  AUDIO
+
+  @@map("enum_media_type")
+}
+
+enum MediaStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  VERIFIED
+  FAILED
+
+  @@map("enum_media_status")
+}
+
+enum InventoryCategory {
+  BED
+  OXYGEN
+  MEDICATION
+
+  @@map("enum_inventory_category")
+}
+
+enum InventoryTxType {
+  CONSUMED
+  RECEIVED_RESTOCK
+  RESERVED
+  RELEASED
+  ADJUSTMENT
+
+  @@map("enum_inventory_tx_type")
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT_FCM
+  DELIVERED
+  READ
+  FAILED
+
+  @@map("enum_delivery_status")
+}
+
+enum SyncEntityType {
+  PATIENT
+  OBSERVATION
+  TRIAGE
+  INVENTORY
+  MEDIA
+
+  @@map("enum_sync_entity_type")
+}
+
+enum SyncOpType {
+  CREATE
+  UPDATE
+  DELETE
+
+  @@map("enum_sync_op_type")
+}
+
+enum SyncProcessingStatus {
+  APPLIED
+  DUPLICATE_IGNORED
+  CONFLICT
+  FAILED
+
+  @@map("enum_sync_status")
+}
+```
+
+---
+
+## 3. Models Definition (18 Models)
+
+```prisma
+// ==========================================
+// 1. IDENTITY & SESSIONS (3 Models)
+// ==========================================
+
+model User {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firebaseUid  String     @unique @map("firebase_uid") @db.VarChar(128)
+  phone        String     @unique @db.VarChar(32)
+  displayName  String     @map("display_name") @db.VarChar(128)
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  devices                Device[]
+  refreshTokens          RefreshToken[]
+  createdIncidents       Incident[]               @relation("IncidentCreator")
+  incidentAssignments    IncidentAssignment[]
+  recordedVitals         PatientVitalSign[]
+  uploadedMedia          PatientMedia[]
+  triageAssessments      TriageAssessment[]
+  inventoryTransactions  InventoryTransaction[]
+  notificationDeliveries NotificationDelivery[]
+  auditLogs              AuditLog[]
+  syncHistory            SyncHistory[]
+
+  @@index([role, status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Device {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String         @map("user_id") @db.Uuid
+  platform     DevicePlatform
+  appVersion   String         @map("app_version") @db.VarChar(32)
+  pushToken    String?        @map("push_token") @db.Text
+  lastActiveAt DateTime       @default(now()) @map("last_active_at") @db.Timestamptz
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens          RefreshToken[]
+  notificationDeliveries NotificationDelivery[]
+
+  @@index([userId, lastActiveAt(sort: Desc)])
+  @@index([pushToken])
+  @@map("devices")
+}
+
+model RefreshToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  deviceId    String?   @map("device_id") @db.Uuid
+  hashedToken String    @unique @map("hashed_token") @db.VarChar(128)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("refresh_tokens")
+}
+
+// ==========================================
+// 2. INCIDENTS & FLEET TELEMETRY (4 Models)
+// ==========================================
+
+model Incident {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentNumber String         @unique @map("incident_number") @db.VarChar(32)
+  title          String         @db.VarChar(128)
+  description    String?        @db.Text
+  status         IncidentStatus   @default(ACTIVE)
+  priority       IncidentPriority @default(HIGH)
+  latitude       Float
+  longitude      Float
+  address        String?        @db.VarChar(256)
+  reportedAt     DateTime       @default(now()) @map("reported_at") @db.Timestamptz
+  resolvedAt     DateTime?      @map("resolved_at") @db.Timestamptz
+  version        Int            @default(1)
+  createdBy      String         @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  creator     User                 @relation("IncidentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  assignments IncidentAssignment[]
+  patients    Patient[]
+
+  @@index([status, priority, reportedAt(sort: Desc)])
+  @@index([latitude, longitude])
+  @@map("incidents")
+}
+
+model Ambulance {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  callSign     String          @unique @map("call_sign") @db.VarChar(32)
+  licensePlate String          @map("license_plate") @db.VarChar(32)
+  status       AmbulanceStatus @default(AVAILABLE)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  assignments     IncidentAssignment[]
+  locationHistory LocationHistory[]
+
+  @@index([status])
+  @@map("ambulances")
+}
+
+model IncidentAssignment {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentId     String    @map("incident_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  ambulanceId    String?   @map("ambulance_id") @db.Uuid
+  assignedAt     DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  releasedAt     DateTime? @map("released_at") @db.Timestamptz
+  roleInIncident String    @default("LEAD_PARAMEDIC") @map("role_in_incident") @db.VarChar(64)
+
+  // Relations
+  incident  Incident   @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ambulance Ambulance? @relation(fields: [ambulanceId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId, userId])
+  @@map("incident_assignments")
+}
+
+model LocationHistory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ambulanceId String   @map("ambulance_id") @db.Uuid
+  latitude    Float
+  longitude   Float
+  speed       Float?   @db.Real
+  heading     Float?   @db.Real
+  recordedAt  DateTime @map("recorded_at") @db.Timestamptz
+
+  // Relations
+  ambulance Ambulance @relation(fields: [ambulanceId], references: [id], onDelete: Cascade)
+
+  @@index([ambulanceId, recordedAt(sort: Desc)])
+  @@map("location_history")
+}
+
+// ==========================================
+// 3. PATIENTS & CLINICAL OBSERVATIONS (4 Models)
+// ==========================================
+
+model Patient {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentId           String?        @map("incident_id") @db.Uuid
+  demoId               String         @unique @map("demo_id") @db.VarChar(32)
+  firstName            String?        @map("first_name") @db.VarChar(64)
+  lastName             String?        @map("last_name") @db.VarChar(64)
+  estimatedAge         Int?           @map("estimated_age") @db.SmallInt
+  gender               Gender         @default(UNKNOWN)
+  status               PatientStatus  @default(FIELD_INTAKE)
+  currentTriageCategory TriageCategory @default(UNASSESSED) @map("current_triage_category")
+  chiefComplaint       String?        @map("chief_complaint") @db.Text
+  notes                String?        @db.Text
+  version              Int            @default(1)
+  clientCreatedAt      DateTime       @map("client_created_at") @db.Timestamptz
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime?      @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  incident             Incident?              @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  vitals               PatientVitalSign[]
+  media                PatientMedia[]
+  triageAssessments    TriageAssessment[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@index([incidentId, status])
+  @@index([currentTriageCategory, createdAt(sort: Asc)])
+  @@index([deletedAt])
+  @@map("patients")
+}
+
+model PatientVitalSign {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId        String      @map("patient_id") @db.Uuid
+  recordedBy       String      @map("recorded_by") @db.Uuid
+  systolicBp       Int?        @map("systolic_bp") @db.SmallInt
+  diastolicBp      Int?        @map("diastolic_bp") @db.SmallInt
+  heartRate        Int?        @map("heart_rate") @db.SmallInt
+  respiratoryRate  Int?        @map("respiratory_rate") @db.SmallInt
+  oxygenSaturation Float?      @map("oxygen_saturation") @db.Real
+  temperature      Float?      @db.Real
+  gcsScore         Int?        @map("gcs_score") @db.SmallInt
+  source           VitalSource @default(PARAMEDIC_FIELD)
+  recordedAt       DateTime    @map("recorded_at") @db.Timestamptz
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  recorder User    @relation(fields: [recordedBy], references: [id], onDelete: Restrict)
+
+  @@index([patientId, recordedAt(sort: Desc)])
+  @@map("patient_vitals")
+}
+
+model PatientMedia {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId        String      @map("patient_id") @db.Uuid
+  uploadedBy       String      @map("uploaded_by") @db.Uuid
+  mediaType        MediaType   @map("media_type")
+  storagePath      String      @unique @map("storage_path") @db.VarChar(512)
+  publicUrl        String?     @map("public_url") @db.Text
+  mimeType         String      @map("mime_type") @db.VarChar(64)
+  fileSizeBytes    Int         @map("file_size_bytes")
+  durationSeconds  Int?        @map("duration_seconds") @db.SmallInt
+  checksumSha256   String?     @map("checksum_sha256") @db.VarChar(64)
+  status           MediaStatus @default(PENDING_UPLOAD)
+  clientCapturedAt DateTime    @map("client_captured_at") @db.Timestamptz
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  uploader User    @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@index([patientId, mediaType])
+  @@map("patient_media")
+}
+
+model TriageAssessment {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patientId          String         @map("patient_id") @db.Uuid
+  assessedBy         String         @map("assessed_by") @db.Uuid
+  canWalk            Boolean        @map("can_walk")
+  hasRespirations    Boolean        @map("has_respirations")
+  respiratoryRate    Int?           @map("respiratory_rate") @db.SmallInt
+  radialPulse        Boolean?       @map("radial_pulse")
+  capillaryRefillSec Float?         @map("capillary_refill_sec") @db.Real
+  followsCommands    Boolean?       @map("follows_commands")
+  calculatedCategory TriageCategory @map("calculated_category")
+  overriddenCategory TriageCategory? @map("overridden_category")
+  overrideReason     String?        @map("override_reason") @db.Text
+  isCurrent          Boolean        @default(true) @map("is_current")
+  assessmentSource   TriageSource   @default(FIELD_START) @map("assessment_source")
+  assessedAt         DateTime       @map("assessed_at") @db.Timestamptz
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  assessor User    @relation(fields: [assessedBy], references: [id], onDelete: Restrict)
+
+  // Note: Database partial unique index enforced via SQL migration:
+  // CREATE UNIQUE INDEX uq_triage_assessments_current_patient ON triage_assessments(patient_id) WHERE is_current = true;
+  @@index([patientId, isCurrent])
+  @@index([assessedAt(sort: Desc)])
+  @@map("triage_assessments")
+}
+
+// ==========================================
+// 4. HOSPITAL LIFE-SUPPORT INVENTORY (2 Models)
+// ==========================================
+
+model InventoryItem {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String            @unique @db.VarChar(128)
+  category          InventoryCategory
+  unit              String            @db.VarChar(32)
+  quantityTotal     Int               @map("quantity_total")
+  quantityAvailable Int               @map("quantity_available")
+  quantityReserved  Int               @default(0) @map("quantity_reserved")
+  lowStockThreshold Int               @default(5) @map("low_stock_threshold")
+  version           Int               @default(1)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  transactions InventoryTransaction[]
+
+  @@index([category, name])
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemId            String          @map("item_id") @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  patientId         String?         @map("patient_id") @db.Uuid
+  transactionType   InventoryTxType @map("transaction_type")
+  quantityDelta     Int             @map("quantity_delta")
+  previousAvailable Int             @map("previous_available")
+  newAvailable      Int             @map("new_available")
+  reason            String          @db.Text
+  requestId         String?         @map("request_id") @db.VarChar(64)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  item    InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  patient Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt(sort: Desc)])
+  @@map("inventory_transactions")
+}
+
+// ==========================================
+// 5. NOTIFICATIONS (2 Models)
+// ==========================================
+
+model Notification {
+  id         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  priority   NotificationPriority @default(LOW)
+  title      String   @db.VarChar(128)
+  body       String   @db.Text
+  category   String   @db.VarChar(64)
+  entityType String?  @map("entity_type") @db.VarChar(32)
+  entityId   String?  @map("entity_id") @db.Uuid
+  deepLink   String?  @map("deep_link") @db.VarChar(256)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  deliveries NotificationDelivery[]
+
+  @@index([category, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notificationId  String         @map("notification_id") @db.Uuid
+  recipientUserId String         @map("recipient_user_id") @db.Uuid
+  deviceId        String?        @map("device_id") @db.Uuid
+  status          DeliveryStatus @default(QUEUED)
+  fcmMessageId    String?        @map("fcm_message_id") @db.VarChar(128)
+  failureReason   String?        @map("failure_reason") @db.Text
+  sentAt          DateTime?      @map("sent_at") @db.Timestamptz
+  deliveredAt     DateTime?      @map("delivered_at") @db.Timestamptz
+  readAt          DateTime?      @map("read_at") @db.Timestamptz
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  recipient    User         @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  device       Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, status])
+  @@index([notificationId])
+  @@map("notification_deliveries")
+}
+
+// ==========================================
+// 6. AUDIT, ANALYTICS & SYNC (3 Models)
+// ==========================================
+
+model AuditLog {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId     String?   @map("actor_user_id") @db.Uuid
+  actorRole       String?   @map("actor_role") @db.VarChar(32)
+  action          String    @db.VarChar(64)
+  entityType      String    @map("entity_type") @db.VarChar(32)
+  entityId        String    @map("entity_id") @db.VarChar(64)
+  clientTimestamp DateTime? @map("client_timestamp") @db.Timestamptz
+  timestamp       DateTime  @default(now()) @db.Timestamptz
+  requestId       String?   @map("request_id") @db.VarChar(64)
+  deviceId        String?   @map("device_id") @db.VarChar(64)
+  ipAddress       String?   @map("ip_address") @db.VarChar(45)
+  userAgent       String?   @map("user_agent") @db.VarChar(256)
+  metadata        Json?     @db.JsonB
+
+  // Relations
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@map("audit_logs")
+}
+
+model DomainEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(64)
+  aggregateType String   @map("aggregate_type") @db.VarChar(32)
+  aggregateId   String   @map("aggregate_id") @db.Uuid
+  incidentId    String?  @map("incident_id") @db.Uuid
+  userId        String?  @map("user_id") @db.Uuid
+  payload       Json     @db.JsonB
+  occurredAt    DateTime @map("occurred_at") @db.Timestamptz
+  recordedAt    DateTime @default(now()) @map("recorded_at") @db.Timestamptz
+
+  @@index([eventType, occurredAt])
+  @@index([incidentId])
+  @@index([aggregateId])
+  @@map("domain_events")
+}
+
+model SyncHistory {
+  operationId     String               @id @map("operation_id") @db.Uuid
+  deviceId        String               @map("device_id") @db.VarChar(64)
+  userId          String               @map("user_id") @db.Uuid
+  entityType      SyncEntityType       @map("entity_type")
+  entityId        String               @map("entity_id") @db.Uuid
+  operationType   SyncOpType           @map("operation_type")
+  clientTimestamp DateTime             @map("client_timestamp") @db.Timestamptz
+  serverTimestamp DateTime             @default(now()) @map("server_timestamp") @db.Timestamptz
+  status          SyncProcessingStatus @default(APPLIED)
+  conflictDetails Json?                @map("conflict_details") @db.JsonB
+  responsePayload Json?                @map("response_payload") @db.JsonB
+  appliedAt       DateTime             @default(now()) @map("applied_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([deviceId, appliedAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@map("sync_history")
+}
+```
