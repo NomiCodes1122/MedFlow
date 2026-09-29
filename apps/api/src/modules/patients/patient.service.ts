@@ -16,7 +16,7 @@ export class PatientService {
   /**
    * Helper to format a database Patient model into a clean PatientResponse DTO.
    */
-  private static toPatientResponse(patient: Patient): PatientResponse {
+  public static toPatientResponse(patient: Patient): PatientResponse {
     return {
       id: patient.id,
       demoId: patient.demoId,
@@ -39,7 +39,7 @@ export class PatientService {
   /**
    * Helper to format a database PatientVitalSign model into a PatientVitalSignResponse DTO.
    */
-  private static toVitalSignResponse(vital: PatientVitalSign): PatientVitalSignResponse {
+  public static toVitalSignResponse(vital: PatientVitalSign): PatientVitalSignResponse {
     return {
       id: vital.id,
       patientId: vital.patientId,

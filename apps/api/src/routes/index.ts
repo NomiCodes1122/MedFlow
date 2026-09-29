@@ -3,6 +3,8 @@ import { ApiResponse } from '../common/http/ApiResponse.js';
 import { authRouter } from '../modules/auth/index.js';
 import { patientRouter } from '../modules/patients/index.js';
 
+import { syncRouter } from '../modules/sync/index.js';
+
 export const apiV1Router = Router();
 
 /**
@@ -23,5 +25,8 @@ apiV1Router.use('/auth', authRouter);
 
 // Patient Domain Routes (Phase 6)
 apiV1Router.use('/patients', patientRouter);
+
+// Offline Sync Routes (Phase 7)
+apiV1Router.use('/sync', syncRouter);
 
 
