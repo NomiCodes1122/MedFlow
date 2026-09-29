@@ -39,9 +39,15 @@ const envSchema = z.object({
   FIREBASE_CLIENT_EMAIL: z.string().optional().default(''),
   FIREBASE_PRIVATE_KEY: z.string().optional().default(''),
 
-  // Secrets for future auth phases
-  JWT_ACCESS_SECRET: z.string().optional().default(''),
-  JWT_REFRESH_SECRET: z.string().optional().default(''),
+  // Security & Authentication Configuration (Phase 5)
+  JWT_ACCESS_SECRET: z
+    .string()
+    .default('medflow-dev-access-jwt-secret-min-32-chars-long!'),
+  JWT_REFRESH_SECRET: z
+    .string()
+    .default('medflow-dev-refresh-jwt-secret-min-32-chars-long!'),
+  JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_DAYS: z.coerce.number().int().positive().default(7),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

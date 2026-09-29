@@ -59,4 +59,45 @@ export class ApiError extends Error {
   static serviceUnavailable(message = 'Service temporarily unavailable'): ApiError {
     return new ApiError(503, ErrorCodes.SERVICE_UNAVAILABLE, message);
   }
+
+  // Authentication & Authorization (Phase 5)
+  static authRequired(message = 'Authentication required', details?: unknown): ApiError {
+    return new ApiError(401, ErrorCodes.AUTH_REQUIRED, message, details);
+  }
+
+  static authInvalidToken(message = 'Invalid authentication token', details?: unknown): ApiError {
+    return new ApiError(401, ErrorCodes.AUTH_INVALID_TOKEN, message, details);
+  }
+
+  static authTokenExpired(message = 'Authentication token expired', details?: unknown): ApiError {
+    return new ApiError(401, ErrorCodes.AUTH_TOKEN_EXPIRED, message, details);
+  }
+
+  static authSessionRevoked(message = 'Session has been revoked', details?: unknown): ApiError {
+    return new ApiError(401, ErrorCodes.AUTH_SESSION_REVOKED, message, details);
+  }
+
+  static authUserInactive(message = 'User account is inactive or suspended', details?: unknown): ApiError {
+    return new ApiError(403, ErrorCodes.AUTH_USER_INACTIVE, message, details);
+  }
+
+  static authUserNotFound(message = 'User account not found or not provisioned', details?: unknown): ApiError {
+    return new ApiError(403, ErrorCodes.AUTH_USER_NOT_FOUND, message, details);
+  }
+
+  static authInvalidRefreshToken(message = 'Invalid or expired refresh token', details?: unknown): ApiError {
+    return new ApiError(401, ErrorCodes.AUTH_INVALID_REFRESH_TOKEN, message, details);
+  }
+
+  static authRefreshTokenReused(message = 'Invalid refresh attempt: token reuse detected', details?: unknown): ApiError {
+    return new ApiError(401, ErrorCodes.AUTH_REFRESH_TOKEN_REUSED, message, details);
+  }
+
+  static authForbidden(message = 'Access forbidden', details?: unknown): ApiError {
+    return new ApiError(403, ErrorCodes.AUTH_FORBIDDEN, message, details);
+  }
+
+  static authRoleRequired(message = 'Insufficient permissions for this resource', details?: unknown): ApiError {
+    return new ApiError(403, ErrorCodes.AUTH_ROLE_REQUIRED, message, details);
+  }
 }

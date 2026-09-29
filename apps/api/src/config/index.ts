@@ -32,6 +32,8 @@ export const config = {
   jwt: {
     accessSecret: env.JWT_ACCESS_SECRET,
     refreshSecret: env.JWT_REFRESH_SECRET,
+    accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
+    refreshExpiresDays: env.JWT_REFRESH_EXPIRES_DAYS,
   },
 } as const;
 

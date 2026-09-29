@@ -1,4 +1,13 @@
-import 'express';
+import { UserRole } from '@prisma/client';
+
+export interface AuthenticatedUserContext {
+  userId: string;
+  firebaseUid: string;
+  phone: string;
+  role: UserRole;
+  sessionId: string;
+  deviceId?: string | null;
+}
 
 declare global {
   namespace Express {
@@ -11,6 +20,14 @@ declare global {
        * Request start time for latency calculation.
        */
       startTime?: number;
+      /**
+       * Authenticated context established by authentication middleware.
+       */
+      auth?: AuthenticatedUserContext;
+      /**
+       * Standard Express user property alias pointing to auth context.
+       */
+      user?: AuthenticatedUserContext;
     }
   }
 }
