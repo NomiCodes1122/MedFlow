@@ -5,6 +5,9 @@
   "description": "MedFlow React Native Mobile App & Offline-First Sync Engine",
   "main": "expo/AppEntry.js",
   "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
     "test": "vitest run",
     "build": "tsc --noEmit"
   },
@@ -21,8 +24,10 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.13.5",
-    "typescript": "~6.0.3",
+    "better-sqlite3": "^11.10.0",
+    "typescript": "~5.7.3",
     "vitest": "^3.0.7"
   }
 }

@@ -7,7 +7,7 @@ import { SyncApiClient } from './src/core/api/api.client';
 import { SecureStoreService } from './src/core/api/secure-store';
 
 // Retrieve backend URL from environment variables, fallback to local dev
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://example.supabase.co';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'fake-key';
 

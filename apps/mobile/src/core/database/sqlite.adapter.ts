@@ -1,12 +1,13 @@
-import { DatabaseSync } from 'node:sqlite';
+import BetterSqlite3 from 'better-sqlite3';
 import { ISqliteDatabase, QueryResult } from './database.interface.js';
 
 export class NodeSqliteAdapter implements ISqliteDatabase {
-  private db: DatabaseSync;
+  private db: BetterSqlite3.Database;
   private transactionQueue: Promise<void> = Promise.resolve();
 
   constructor(filename: string = ':memory:') {
-    this.db = new DatabaseSync(filename);
+    this.db = new BetterSqlite3(filename);
+    this.db.pragma('journal_mode = WAL');
   }
 
   async execAsync(sql: string): Promise<void> {
@@ -21,7 +22,7 @@ export class NodeSqliteAdapter implements ISqliteDatabase {
     const stmt = this.db.prepare(sql);
     const result = stmt.run(...this.sanitizeParams(params));
     return {
-      changes: Number(result.changes),
+      changes: result.changes,
       lastInsertRowId: Number(result.lastInsertRowid),
     };
   }

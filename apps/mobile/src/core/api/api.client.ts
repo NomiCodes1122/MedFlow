@@ -9,7 +9,7 @@ export class SyncApiClient {
   private baseUrl: string;
 
   constructor(config?: Partial<ApiClientConfig>) {
-    this.baseUrl = config?.baseUrl || 'http://localhost:3000';
+    this.baseUrl = config?.baseUrl || 'http://localhost:4000';
   }
 
   setBaseUrl(url: string): void {

@@ -1,5 +1,23 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+// Node.js fs/path are loaded lazily to avoid crashing React Native / Metro bundler.
+// Only FileSecureStoreAdapter (used in tests/desktop) needs them.
+let _fs: typeof import('node:fs') | null = null;
+let _path: typeof import('node:path') | null = null;
+
+function getFs() {
+  if (!_fs) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _fs = require('node:fs');
+  }
+  return _fs!;
+}
+
+function getPath() {
+  if (!_path) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _path = require('node:path');
+  }
+  return _path!;
+}
 
 export interface ISecureStoreAdapter {
   getItem(key: string): Promise<string | null>;
@@ -38,11 +56,12 @@ export class FileSecureStoreAdapter implements ISecureStoreAdapter {
   private filePath: string;
 
   constructor(customPath?: string) {
-    this.filePath = customPath || path.resolve(process.cwd(), '.medflow_secure_store.json');
+    this.filePath = customPath || getPath().resolve(process.cwd(), '.medflow_secure_store.json');
   }
 
   private readStore(): Record<string, string> {
     try {
+      const fs = getFs();
       if (fs.existsSync(this.filePath)) {
         const raw = fs.readFileSync(this.filePath, 'utf-8');
         return JSON.parse(raw);
@@ -55,7 +74,7 @@ export class FileSecureStoreAdapter implements ISecureStoreAdapter {
 
   private writeStore(data: Record<string, string>): void {
     try {
-      fs.writeFileSync(this.filePath, JSON.stringify(data, null, 2), {
+      getFs().writeFileSync(this.filePath, JSON.stringify(data, null, 2), {
         encoding: 'utf-8',
         mode: 0o600, // Restricted file permissions (owner read/write only)
       });
@@ -83,6 +102,7 @@ export class FileSecureStoreAdapter implements ISecureStoreAdapter {
 
   clear(): void {
     try {
+      const fs = getFs();
       if (fs.existsSync(this.filePath)) {
         fs.unlinkSync(this.filePath);
       }
