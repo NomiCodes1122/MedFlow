@@ -16,7 +16,7 @@ import { AuthenticatedUserContext } from '../../types/express.js';
 describe('PatientService Unit Tests', () => {
   const mockUserContext: AuthenticatedUserContext = {
     userId: '11111111-1111-1111-1111-111111111111',
-    firebaseUid: 'fb-paramedic-001',
+    supabaseUid: 'fb-paramedic-001',
     phone: '+15550100001',
     role: UserRole.PARAMEDIC,
     sessionId: 'session-uuid-001',
@@ -24,7 +24,7 @@ describe('PatientService Unit Tests', () => {
 
   const mockDoctorContext: AuthenticatedUserContext = {
     userId: '22222222-2222-2222-2222-222222222222',
-    firebaseUid: 'fb-doctor-001',
+    supabaseUid: 'fb-doctor-001',
     phone: '+15550100002',
     role: UserRole.TRIAGE_DOCTOR,
     sessionId: 'session-uuid-002',

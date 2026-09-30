@@ -4,6 +4,7 @@ import path from 'path';
 
 // Load environment variables from root or apps/api .env
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 dotenv.config(); // fallback to default location
 
 const envSchema = z.object({
@@ -38,6 +39,12 @@ const envSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().optional().default(''),
   FIREBASE_CLIENT_EMAIL: z.string().optional().default(''),
   FIREBASE_PRIVATE_KEY: z.string().optional().default(''),
+
+  // Supabase Storage Configuration (Phase 8 Multimedia)
+  SUPABASE_URL: z.string().optional().default(''),
+  SUPABASE_ANON_KEY: z.string().optional().default(''),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(''),
+  SUPABASE_STORAGE_BUCKET: z.string().default('medflow-media'),
 
   // Security & Authentication Configuration (Phase 5)
   JWT_ACCESS_SECRET: z

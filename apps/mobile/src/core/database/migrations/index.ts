@@ -97,6 +97,75 @@ export const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 2,
+    name: '002_local_media_queue',
+    up: async (db: ISqliteDatabase) => {
+      // 5. Local Media Queue Table (Phase 8 Multimedia)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS local_media_queue (
+          id TEXT PRIMARY KEY,
+          local_patient_id TEXT NOT NULL,
+          server_patient_id TEXT,
+          media_type TEXT NOT NULL,
+          local_uri TEXT NOT NULL,
+          mime_type TEXT NOT NULL,
+          file_size_bytes INTEGER NOT NULL,
+          duration_seconds INTEGER,
+          checksum_sha256 TEXT,
+          sync_status TEXT NOT NULL DEFAULT 'PENDING',
+          retry_count INTEGER NOT NULL DEFAULT 0,
+          max_retries INTEGER NOT NULL DEFAULT 5,
+          last_error_message TEXT,
+          next_retry_at INTEGER,
+          server_media_id TEXT,
+          storage_path TEXT,
+          remote_url TEXT,
+          captured_at INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_media_patient ON local_media_queue(local_patient_id);
+        CREATE INDEX IF NOT EXISTS idx_media_sync ON local_media_queue(sync_status, next_retry_at);
+      `);
+    },
+  },
+  {
+    version: 3,
+    name: '003_local_triage_queue',
+    up: async (db: ISqliteDatabase) => {
+      // 6. Local Triage Assessments Table (Phase 9 Offline Triage)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS local_triage_assessments (
+          id TEXT PRIMARY KEY,
+          local_patient_id TEXT NOT NULL,
+          server_patient_id TEXT,
+          protocol_code TEXT NOT NULL DEFAULT 'START',
+          protocol_version TEXT NOT NULL DEFAULT '1.0.0',
+          care_setting TEXT NOT NULL DEFAULT 'PRE_HOSPITAL',
+          calculated_category TEXT NOT NULL,
+          overridden_category TEXT,
+          override_reason TEXT,
+          assessment_data TEXT,
+          decision_trace TEXT,
+          assessment_source TEXT NOT NULL DEFAULT 'FIELD_START',
+          assessed_by TEXT,
+          sync_status TEXT NOT NULL DEFAULT 'PENDING',
+          assessed_at INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_triage_patient ON local_triage_assessments(local_patient_id, assessed_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_triage_sync ON local_triage_assessments(sync_status);
+      `);
+
+      // Add current_triage_assessment_id to patients table if not exists
+      try {
+        await db.execAsync(`ALTER TABLE patients ADD COLUMN current_triage_assessment_id TEXT;`);
+      } catch {
+        // Column may already exist
+      }
+    },
+  },
 ];
 
 export async function runMigrations(db: ISqliteDatabase): Promise<void> {

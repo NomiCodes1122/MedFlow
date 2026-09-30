@@ -7,7 +7,7 @@ import { ErrorCodes } from '../../common/errors/errorCodes.js';
 describe('TokenService', () => {
   const samplePayload = {
     sub: '11111111-1111-1111-1111-111111111111',
-    firebaseUid: 'firebase-user-001',
+    supabaseUid: 'firebase-user-001',
     phone: '+15550100001',
     role: UserRole.PARAMEDIC,
     sessionId: 'session-uuid-1234',
@@ -21,7 +21,7 @@ describe('TokenService', () => {
 
     const decoded = TokenService.verifyAccessToken(token);
     expect(decoded.sub).toBe(samplePayload.sub);
-    expect(decoded.firebaseUid).toBe(samplePayload.firebaseUid);
+    expect(decoded.supabaseUid).toBe(samplePayload.supabaseUid);
     expect(decoded.phone).toBe(samplePayload.phone);
     expect(decoded.role).toBe(UserRole.PARAMEDIC);
     expect(decoded.sessionId).toBe(samplePayload.sessionId);

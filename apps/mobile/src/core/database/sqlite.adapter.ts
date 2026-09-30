@@ -3,6 +3,7 @@ import { ISqliteDatabase, QueryResult } from './database.interface.js';
 
 export class NodeSqliteAdapter implements ISqliteDatabase {
   private db: DatabaseSync;
+  private transactionQueue: Promise<void> = Promise.resolve();
 
   constructor(filename: string = ':memory:') {
     this.db = new DatabaseSync(filename);
@@ -38,14 +39,33 @@ export class NodeSqliteAdapter implements ISqliteDatabase {
   }
 
   async withTransactionAsync<T>(action: () => Promise<T>): Promise<T> {
-    this.db.exec('BEGIN TRANSACTION');
+    const execute = async () => {
+      this.db.exec('BEGIN TRANSACTION');
+      try {
+        const result = await action();
+        this.db.exec('COMMIT');
+        return result;
+      } catch (err) {
+        try {
+          this.db.exec('ROLLBACK');
+        } catch {
+          // Ignore rollback error if already closed
+        }
+        throw err;
+      }
+    };
+
+    const previousQueue = this.transactionQueue;
+    let resolveQueue: () => void;
+    this.transactionQueue = new Promise<void>((resolve) => {
+      resolveQueue = resolve;
+    });
+
     try {
-      const result = await action();
-      this.db.exec('COMMIT');
-      return result;
-    } catch (err) {
-      this.db.exec('ROLLBACK');
-      throw err;
+      await previousQueue;
+      return await execute();
+    } finally {
+      resolveQueue!();
     }
   }
 

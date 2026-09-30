@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UserRole, UserStatus, DevicePlatform } from '@prisma/client';
 import { AuthService } from './auth.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
-import { FirebaseAuthService } from './firebase-auth.service.js';
+import { SupabaseAuthService } from './supabase-auth.service.js';
 import { TokenService } from './token.service.js';
 import { ApiError } from '../../common/errors/ApiError.js';
 import { ErrorCodes } from '../../common/errors/errorCodes.js';
@@ -35,7 +35,7 @@ vi.mock('../../database/prisma.js', () => {
 describe('AuthService & RefreshTokenService', () => {
   const mockUser = {
     id: '11111111-1111-1111-1111-111111111111',
-    firebaseUid: 'firebase-uid-paramedic-001',
+    supabaseUid: 'firebase-uid-paramedic-001',
     phone: '+15550100001',
     displayName: 'Sarah Connor (Lead Paramedic)',
     role: UserRole.PARAMEDIC,
@@ -64,8 +64,8 @@ describe('AuthService & RefreshTokenService', () => {
   describe('establishSession', () => {
     it('should authenticate a valid provisioned user and issue short-lived token and rotational refresh session', async () => {
       // Mock Firebase verification
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockUser.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockUser.supabaseUid,
         phone: mockUser.phone,
       }));
 
@@ -92,44 +92,13 @@ describe('AuthService & RefreshTokenService', () => {
       expect(decoded.sessionId).toBe(mockSession.id);
     });
 
-    it('should link Firebase UID to pre-provisioned user matched by phone number on first login', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: 'new-firebase-uid-from-sms',
-        phone: mockUser.phone,
-      }));
-
-      // First lookup by firebaseUid fails, second by phone succeeds
-      vi.mocked(prisma.user.findUnique)
-        .mockResolvedValueOnce(null) // by firebaseUid
-        .mockResolvedValueOnce(mockUser as any); // by phone
-
-      vi.mocked(prisma.user.update).mockResolvedValueOnce({
-        ...mockUser,
-        firebaseUid: 'new-firebase-uid-from-sms',
-      } as any);
-
-      vi.mocked(prisma.refreshToken.create).mockResolvedValueOnce(mockSession as any);
-
-      const result = await AuthService.establishSession({
-        idToken: 'first-time-login-token',
-      });
-
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: mockUser.id },
-        data: { firebaseUid: 'new-firebase-uid-from-sms' },
-      });
-      expect(result.user.id).toBe(mockUser.id);
-    });
-
     it('should reject unprovisioned users with AUTH_USER_NOT_FOUND', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
+      SupabaseAuthService.setCustomVerifier(async () => ({
         uid: 'unauthorized-stranger-uid',
         phone: '+15559999999',
       }));
 
-      vi.mocked(prisma.user.findUnique)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      vi.mocked(prisma.user.findUnique).mockResolvedValueOnce(null);
 
       try {
         await AuthService.establishSession({ idToken: 'unprovisioned-token' });
@@ -141,8 +110,8 @@ describe('AuthService & RefreshTokenService', () => {
     });
 
     it('should reject inactive or suspended users with AUTH_USER_INACTIVE', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockUser.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockUser.supabaseUid,
       }));
 
       vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
@@ -160,8 +129,8 @@ describe('AuthService & RefreshTokenService', () => {
     });
 
     it('should reject soft-deleted users with AUTH_USER_INACTIVE', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockUser.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockUser.supabaseUid,
       }));
 
       vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
@@ -175,8 +144,8 @@ describe('AuthService & RefreshTokenService', () => {
     });
 
     it('should register and bind device metadata when provided', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockUser.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockUser.supabaseUid,
       }));
 
       const mockDevice = {

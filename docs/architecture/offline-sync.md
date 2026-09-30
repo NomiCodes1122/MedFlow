@@ -20,7 +20,7 @@ MedFlow is engineered for disaster zones and extreme triage conditions where cel
           └──────┬──────┘
                  │ Durable Mutation
           ┌──────▼────────┐
-          │ Outbox Queue  │ (PENDING / SYNCING / SYNCED / CONFLICT)
+          │ Outbox Queue  │ (PENDING / SYNCING / SYNCED / CONFLICT / DISCARDED)
           └──────┬────────┘
                  │ Atomic Claim & Batching
           ┌──────▼────────┐
@@ -28,9 +28,9 @@ MedFlow is engineered for disaster zones and extreme triage conditions where cel
           └──────┬────────┘
                  │ HTTPS (POST /api/v1/sync/batch)
           ┌──────▼────────┐
-          │  Express API  │ (Authentication, RBAC, Validation)
+          │  Express API  │ (Authentication, RBAC, Domain Validation, Isolation)
           └──────┬────────┘
-                 │ Prisma Transaction
+                 │ Isolated Per-Operation Transactions
           ┌──────▼────────┐
           │  PostgreSQL   │
           │  SyncHistory  │ (Idempotency Registry & Master Tables)
@@ -62,13 +62,13 @@ Local point-in-time clinical vital sign observations.
 ### 2.3 `outbox_operations`
 Durable append-only queue of client-side mutations.
 - `operation_id` (TEXT PRIMARY KEY): Client-generated UUID acting as an idempotency key.
-- `client_id` (TEXT): Hardware/installation installation ID.
+- `client_id` (TEXT): Unique persistent hardware/installation UUID (`DeviceIdentityService`).
 - `entity_type` (TEXT): `PATIENT` | `OBSERVATION`.
 - `entity_id` (TEXT): Target local/server entity UUID.
 - `operation_type` (TEXT): `CREATE` | `UPDATE` | `DELETE`.
 - `payload` (TEXT): Serialized JSON mutation payload.
 - `base_version` (INTEGER): Expected server version for OCC validation.
-- `sync_status` (TEXT): `PENDING` | `SYNCING` | `SYNCED` | `FAILED` | `CONFLICT` | `BLOCKED`.
+- `sync_status` (TEXT): `PENDING` | `SYNCING` | `SYNCED` | `FAILED` | `CONFLICT` | `BLOCKED` | `DISCARDED`.
 - `retry_count`, `max_retries`, `next_retry_at`, `conflict_details`.
 
 ---
@@ -87,11 +87,16 @@ stateDiagram-v2
     
     SYNCING --> CONFLICT: Server returns 409 CONFLICT (OCC version mismatch)
     
+    CONFLICT --> PENDING: User selects KEEP_LOCAL or MANUAL_MERGE
+    
+    CONFLICT --> DISCARDED: User selects ACCEPT_SERVER
+    
     SYNCING --> BLOCKED: Max retries exceeded / Validation failure
     
     SYNCING --> PENDING: Crash recovery on startup (recoverStuckSyncing)
     
     SYNCED --> [*]
+    DISCARDED --> [*]
 ```
 
 ### State Transitions:
@@ -99,21 +104,48 @@ stateDiagram-v2
 2. **SYNCING → SYNCED:** Operation acknowledged by server and local entity reconciled.
 3. **SYNCING → PENDING (Retry):** Network failure or 5xx error calculates exponential backoff with jitter and sets `next_retry_at`.
 4. **SYNCING → CONFLICT:** Version mismatch surfaces conflict details to user.
-5. **SYNCING → BLOCKED:** Non-retryable error (e.g. malformed payload or permanent business rule failure).
+5. **CONFLICT → PENDING:** User resolves conflict via `KEEP_LOCAL` or `MANUAL_MERGE`.
+6. **CONFLICT → DISCARDED:** User resolves conflict via `ACCEPT_SERVER`, discarding local changes.
+7. **SYNCING → BLOCKED:** Non-retryable error (e.g. malformed payload or permanent business rule failure).
 
 ---
 
-## 4. Concurrency Protection & Serialization
+## 4. Conflict Resolution Workflow & Explicit Strategies
 
-1. **Worker Mutex:** Only one logical synchronization worker may run per device at any time. In-flight requests return the shared active Promise.
-2. **Atomic Batch Claim:** Operations are claimed using `UPDATE outbox_operations SET sync_status = 'SYNCING' WHERE operation_id IN (...)` within an SQLite transaction, preventing race conditions between reconnect events and manual sync gestures.
-3. **Crash Recovery (`recoverStuckSyncing`):** If the application process terminates mid-sync, all operations stuck in `SYNCING` status are reset to `PENDING` upon engine initialization.
+When an optimistic concurrency conflict occurs on patient demographics, the sync engine surfaces the conflict to the clinician:
+
+1. **`KEEP_LOCAL` Strategy:**
+   - Clinician determines the local field update should overwrite server data.
+   - The engine updates the local patient `server_version` to `currentServerVersion`.
+   - The outbox mutation is re-enqueued to `PENDING` with `base_version = currentServerVersion`.
+   - On the next sync cycle, the server OCC check succeeds and advances to version $V+1$.
+
+2. **`ACCEPT_SERVER` Strategy:**
+   - Clinician accepts authoritative server state and discards local edits.
+   - The engine updates the local patient record with `currentServerState`, sets `sync_status = 'SYNCED'` and `is_dirty = 0`.
+   - The outbox mutation transitions to `DISCARDED`.
+
+3. **`MANUAL_MERGE` Strategy:**
+   - Clinician selectively merges specific fields from local and server states.
+   - The engine writes merged fields to local SQLite and re-enqueues outbox mutation with merged payload and `base_version = currentServerVersion`.
 
 ---
 
-## 5. Conflict Resolution Matrix
+## 5. Batch Failure Isolation & Strict Domain Validation
 
-| Entity | Conflict Condition | Policy | Resolution Mechanism |
-| :--- | :--- | :--- | :--- |
-| **Patient Profile** | Server `version` differs from client `baseVersion` | Optimistic Concurrency Control (OCC) | Server rejects mutation with HTTP 409 `CONFLICT`. Outbox marks mutation `CONFLICT`. Client surfaces side-by-side reconciliation to user. |
-| **Vital Signs** | Multiple observations recorded concurrently | Append-Only Stream | Zero conflict. Every observation represents an immutable point-in-time clinical record merged chronologically by `recordedAt`. |
+1. **Envelope Validation:** HTTP schema validation guarantees well-formed envelope, valid UUIDs, and authorized roles (`PARAMEDIC`, `TRIAGE_DOCTOR`).
+2. **Strict Domain Payload Validation:** Each operation's payload is strictly validated against domain-specific Zod schemas (`syncPatientCreatePayloadSchema`, `syncPatientUpdatePayloadSchema`, `syncVitalCreatePayloadSchema`).
+3. **Failure Isolation:** Each operation executes within its own isolated transaction boundary. If an operation fails domain validation or encounters a database constraint, it is recorded as `FAILED` in `sync_history`, while unrelated valid operations in the same batch commit successfully as `APPLIED`. This eliminates head-of-line batch blocking.
+
+---
+
+## 6. Synchronization UI Architecture
+
+1. **`useSyncUIState` Hook:** Subscribes reactively to Zustand `syncStore` and provides formatted timestamps, status pill colors, pending counts, and trigger functions.
+2. **`SyncStatusBar` Component:** Renders an accessible top banner with:
+   - Online / Offline indicator dot and text
+   - Pending operations badge count
+   - Conflict warning pill (with count)
+   - Last sync timestamp ("Just now", "2m ago", "Never synced")
+   - Manual "Sync Now" button with disabled and active states
+3. **`ConflictResolutionModal` Component:** Displays side-by-side comparison of local vs server fields with action buttons for `Keep Local Changes`, `Accept Server State`, and `Merge Changes`.

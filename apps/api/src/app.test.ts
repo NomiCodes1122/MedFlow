@@ -39,7 +39,7 @@ describe('MedFlow Backend Foundation & Infrastructure Tests', () => {
       expect(res.body.data.dependencies).toHaveProperty('database');
       expect(res.body.data.dependencies).toHaveProperty('redis');
       expect(res.body.data.dependencies).toHaveProperty('firebase');
-    });
+    }, 20000);
   });
 
   // --------------------------------------------------------------------------

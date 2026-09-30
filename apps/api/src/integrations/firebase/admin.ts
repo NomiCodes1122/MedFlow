@@ -49,10 +49,6 @@ export function checkFirebaseHealth(): boolean {
   return isInitialized && firebaseApp !== null;
 }
 
-export function getFirebaseAuth(): admin.auth.Auth | null {
-  const app = getFirebaseAdminApp();
-  return app ? app.auth() : null;
-}
 
 export function getFirebaseMessaging(): admin.messaging.Messaging | null {
   const app = getFirebaseAdminApp();

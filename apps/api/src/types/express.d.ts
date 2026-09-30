@@ -2,7 +2,7 @@ import { UserRole } from '@prisma/client';
 
 export interface AuthenticatedUserContext {
   userId: string;
-  firebaseUid: string;
+  supabaseUid: string;
   phone: string;
   role: UserRole;
   sessionId: string;

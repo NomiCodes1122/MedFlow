@@ -23,7 +23,7 @@ vi.mock('../../database/prisma.js', () => {
 describe('Authentication & RBAC Middleware', () => {
   const mockUser = {
     id: 'user-uuid-paramedic-001',
-    firebaseUid: 'firebase-uid-001',
+    supabaseUid: 'firebase-uid-001',
     phone: '+15550100001',
     displayName: 'Sarah Connor',
     role: UserRole.PARAMEDIC,
@@ -33,7 +33,7 @@ describe('Authentication & RBAC Middleware', () => {
 
   const validPayload = {
     sub: mockUser.id,
-    firebaseUid: mockUser.firebaseUid,
+    supabaseUid: mockUser.supabaseUid,
     phone: mockUser.phone,
     role: mockUser.role,
     sessionId: 'session-uuid-12345',

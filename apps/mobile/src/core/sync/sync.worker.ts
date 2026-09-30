@@ -5,6 +5,7 @@ import { VitalsLocalRepository } from '../database/repositories/vitals.repositor
 import { SyncApiClient, SyncApiError } from '../api/api.client.js';
 import { SyncRetryPolicy } from './sync.retry.js';
 import { useSyncStore } from './sync.store.js';
+import { DeviceIdentityService } from '../device/device-identity.service.js';
 
 export interface SyncCycleResult {
   processedCount: number;
@@ -37,8 +38,10 @@ export class SyncWorker {
       return { processedCount: 0, appliedCount: 0, conflictCount: 0, failedCount: 0 };
     }
 
+    const deviceId = await DeviceIdentityService.getDeviceId();
+
     const batchPayload = {
-      deviceId: SYNC_CONSTANTS.CLIENT_ID,
+      deviceId,
       clientBatchTimestamp: new Date().toISOString(),
       operations: claimedOps.map((op) => ({
         operationId: op.operation_id,
@@ -121,6 +124,7 @@ export class SyncWorker {
             localPayload: JSON.parse(op.payload),
             serverVersion: result.conflictDetails?.currentServerVersion,
             expectedVersion: result.conflictDetails?.expectedVersion,
+            serverState: result.conflictDetails?.currentServerState ?? undefined,
             message: result.conflictDetails?.message || 'OCC Version Conflict',
             detectedAt: Date.now(),
           });

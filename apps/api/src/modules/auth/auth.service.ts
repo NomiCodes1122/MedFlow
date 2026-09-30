@@ -3,7 +3,7 @@ import { prisma } from '../../database/prisma.js';
 import { ApiError } from '../../common/errors/ApiError.js';
 import { logger } from '../../common/logging/logger.js';
 import { TokenService } from './token.service.js';
-import { FirebaseAuthService } from './firebase-auth.service.js';
+import { SupabaseAuthService } from './supabase-auth.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
 import {
   SessionEstablishInput,
@@ -15,10 +15,10 @@ import {
 
 export class AuthService {
   /**
-   * Establishes a verified MedFlow application session from a Firebase ID token.
+   * Establishes a verified MedFlow application session from a Supabase JWT.
    *
    * SECURITY ENFORCEMENT:
-   * 1. Derives identity solely from cryptographically verified Firebase ID token.
+   * 1. Derives identity solely from cryptographically verified Supabase JWT.
    * 2. Rejects unprovisioned users (no auto-provisioning of privileged roles).
    * 3. Authoritative role strictly originates from Supabase PostgreSQL database record.
    * 4. Validates that the user is ACTIVE and not soft-deleted.
@@ -26,38 +26,18 @@ export class AuthService {
    * 6. Generates hashed rotational refresh session and short-lived access JWT.
    */
   static async establishSession(input: SessionEstablishInput): Promise<AuthSessionResult> {
-    // 1. Verify Firebase ID Token
-    const verified = await FirebaseAuthService.verifyIdToken(input.idToken);
+    // 1. Verify Supabase JWT Token
+    const verified = await SupabaseAuthService.verifyIdToken(input.idToken);
 
     // 2. Resolve MedFlow User Record
-    // First attempt: lookup by verified firebaseUid
-    let user = await prisma.user.findUnique({
-      where: { firebaseUid: verified.uid },
+    const user = await prisma.user.findUnique({
+      where: { supabaseUid: verified.uid },
     });
-
-    // Fallback: If not found by firebaseUid but phone number is present in verified claims,
-    // link pre-provisioned user record with their first-time verified Firebase UID.
-    if (!user && verified.phone) {
-      const userByPhone = await prisma.user.findUnique({
-        where: { phone: verified.phone },
-      });
-
-      if (userByPhone) {
-        user = await prisma.user.update({
-          where: { id: userByPhone.id },
-          data: { firebaseUid: verified.uid },
-        });
-        logger.info(
-          { userId: user.id, phone: user.phone },
-          'Pre-provisioned user bound to verified Firebase UID on first login'
-        );
-      }
-    }
 
     // 3. User must be pre-provisioned
     if (!user) {
       logger.warn(
-        { firebaseUid: verified.uid, phone: verified.phone },
+        { supabaseUid: verified.uid, phone: verified.phone },
         'Authentication rejected: user is not provisioned in MedFlow system'
       );
       throw ApiError.authUserNotFound(
@@ -122,7 +102,7 @@ export class AuthService {
     // 7. Issue Short-Lived Access Token (15m)
     const accessToken = TokenService.signAccessToken({
       sub: user.id,
-      firebaseUid: user.firebaseUid,
+      supabaseUid: user.supabaseUid,
       phone: user.phone,
       role: user.role, // Strictly from database
       sessionId: session.id,
@@ -173,7 +153,7 @@ export class AuthService {
     // 3. Issue new short-lived access token
     const accessToken = TokenService.signAccessToken({
       sub: user.id,
-      firebaseUid: user.firebaseUid,
+      supabaseUid: user.supabaseUid,
       phone: user.phone,
       role: user.role,
       sessionId: newSession.id,

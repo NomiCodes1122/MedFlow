@@ -3,17 +3,26 @@
   "version": "1.0.0",
   "private": true,
   "description": "MedFlow React Native Mobile App & Offline-First Sync Engine",
-  "main": "src/index.ts",
+  "main": "expo/AppEntry.js",
   "scripts": {
     "test": "vitest run",
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-navigation/native": "^7.5.0",
+    "@react-navigation/native-stack": "^7.20.0",
+    "@supabase/supabase-js": "^2.117.2",
+    "@types/react": "~19.2.4",
+    "expo": "^57.0.26",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
-    "typescript": "^5.7.3",
+    "typescript": "~6.0.3",
     "vitest": "^3.0.7"
   }
 }

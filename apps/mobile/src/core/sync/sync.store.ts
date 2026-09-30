@@ -15,6 +15,7 @@ export interface SyncStoreState {
   setCounts: (pending: number, conflicts: number) => void;
   setLastSyncedAt: (date: Date) => void;
   addConflict: (conflict: ConflictReport) => void;
+  removeConflict: (operationId: string) => void;
   clearConflicts: () => void;
 }
 
@@ -31,10 +32,22 @@ export const syncStore = createStore<SyncStoreState>((set) => ({
   setCounts: (pendingCount, conflictCount) => set({ pendingCount, conflictCount }),
   setLastSyncedAt: (lastSyncedAt) => set({ lastSyncedAt }),
   addConflict: (conflict) =>
-    set((state) => ({
-      activeConflicts: [conflict, ...state.activeConflicts],
-      conflictCount: state.conflictCount + 1,
-    })),
+    set((state) => {
+      // Avoid duplicate conflict reports for same operationId
+      const existingFiltered = state.activeConflicts.filter((c) => c.operationId !== conflict.operationId);
+      return {
+        activeConflicts: [conflict, ...existingFiltered],
+        conflictCount: existingFiltered.length + 1,
+      };
+    }),
+  removeConflict: (operationId) =>
+    set((state) => {
+      const filtered = state.activeConflicts.filter((c) => c.operationId !== operationId);
+      return {
+        activeConflicts: filtered,
+        conflictCount: filtered.length,
+      };
+    }),
   clearConflicts: () => set({ activeConflicts: [], conflictCount: 0 }),
 }));
 

@@ -10,6 +10,8 @@ import {
   createVitalSignSchema,
 } from './patient.schemas.js';
 import { PatientController } from './patient.controller.js';
+import { patientMediaRouter } from '../media/media.routes.js';
+import { patientTriageRouter } from '../triage/triage.routes.js';
 
 export const patientRouter = Router();
 
@@ -93,3 +95,16 @@ patientRouter.get(
   validate({ params: patientParamsSchema }),
   PatientController.getVitals
 );
+
+/**
+ * Media Attachments (Phase 8)
+ * Mounted at /api/v1/patients/:id/media
+ */
+patientRouter.use('/:id/media', patientMediaRouter);
+
+/**
+ * Triage Assessments & History (Phase 9)
+ * Mounted at /api/v1/patients/:id/triage
+ */
+patientRouter.use('/:id/triage', patientTriageRouter);
+

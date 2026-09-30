@@ -58,7 +58,7 @@ describe('Auth Security Audits & Secret Redaction', () => {
     // Ensure access token payload structure does not contain secrets
     const payload = {
       sub: 'user-id-123',
-      firebaseUid: 'fb-uid-123',
+      supabaseUid: 'fb-uid-123',
       phone: '+15550100001',
       role: 'PARAMEDIC' as const,
       sessionId: 'session-123',

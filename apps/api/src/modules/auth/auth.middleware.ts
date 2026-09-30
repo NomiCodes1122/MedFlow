@@ -65,7 +65,7 @@ export async function requireAuthentication(
     // 4. Attach authenticated user context
     const authContext: AuthenticatedUserContext = {
       userId: user.id,
-      firebaseUid: user.firebaseUid,
+      supabaseUid: user.supabaseUid,
       phone: user.phone,
       role: user.role, // Authoritative database role
       sessionId: decoded.sessionId,

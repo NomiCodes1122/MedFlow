@@ -24,7 +24,6 @@ export const createPatientSchema = z.object({
     .nullable(),
   gender: z.nativeEnum(Gender).default(Gender.UNKNOWN),
   status: z.nativeEnum(PatientStatus).default(PatientStatus.FIELD_INTAKE),
-  currentTriageCategory: z.nativeEnum(TriageCategory).default(TriageCategory.UNASSESSED),
   chiefComplaint: z.string().trim().max(2000, 'Chief complaint cannot exceed 2000 characters').optional().nullable(),
   notes: z.string().trim().max(5000, 'Notes cannot exceed 5000 characters').optional().nullable(),
   clientCreatedAt: z
@@ -51,7 +50,6 @@ export const updatePatientSchema = z.object({
     .nullable(),
   gender: z.nativeEnum(Gender).optional(),
   status: z.nativeEnum(PatientStatus).optional(),
-  currentTriageCategory: z.nativeEnum(TriageCategory).optional(),
   chiefComplaint: z.string().trim().max(2000, 'Chief complaint cannot exceed 2000 characters').optional().nullable(),
   notes: z.string().trim().max(5000, 'Notes cannot exceed 5000 characters').optional().nullable(),
 });

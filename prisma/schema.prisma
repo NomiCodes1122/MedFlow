@@ -169,6 +169,8 @@ enum SyncEntityType {
   TRIAGE
   INVENTORY
   MEDIA
+  ALERT
+  NOTIFICATION
 
   @@map("enum_sync_entity_type")
 }
@@ -196,7 +198,7 @@ enum SyncProcessingStatus {
 
 model User {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  firebaseUid String     @unique @map("firebase_uid") @db.VarChar(128)
+  supabaseUid String     @unique @map("supabase_uid") @db.VarChar(128)
   phone       String     @unique @db.VarChar(32)
   displayName String     @map("display_name") @db.VarChar(128)
   role        UserRole
@@ -216,6 +218,8 @@ model User {
   inventoryTransactions  InventoryTransaction[]
   notificationDeliveries NotificationDelivery[]
   auditLogs              AuditLog[]
+  assignedAlerts         Alert[]                @relation("AlertAssignee")
+  createdAlerts          Alert[]                @relation("AlertCreator")
   syncHistory            SyncHistory[]
 
   @@index([role, status])
@@ -268,26 +272,27 @@ model RefreshToken {
 // ==========================================
 
 model Incident {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  incidentNumber String         @unique @map("incident_number") @db.VarChar(32)
-  title          String         @db.VarChar(128)
-  description    String?        @db.Text
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentNumber String           @unique @map("incident_number") @db.VarChar(32)
+  title          String           @db.VarChar(128)
+  description    String?          @db.Text
   status         IncidentStatus   @default(ACTIVE)
   priority       IncidentPriority @default(HIGH)
   latitude       Float
   longitude      Float
-  address        String?        @db.VarChar(256)
-  reportedAt     DateTime       @default(now()) @map("reported_at") @db.Timestamptz
-  resolvedAt     DateTime?      @map("resolved_at") @db.Timestamptz
-  version        Int            @default(1)
-  createdBy      String         @map("created_by") @db.Uuid
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  address        String?          @db.VarChar(256)
+  reportedAt     DateTime         @default(now()) @map("reported_at") @db.Timestamptz
+  resolvedAt     DateTime?        @map("resolved_at") @db.Timestamptz
+  version        Int              @default(1)
+  createdBy      String           @map("created_by") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   creator     User                 @relation("IncidentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   assignments IncidentAssignment[]
   patients    Patient[]
+  alerts      Alert[]
 
   @@index([status, priority, reportedAt(sort: Desc)])
   @@index([latitude, longitude])
@@ -351,29 +356,32 @@ model LocationHistory {
 // ==========================================
 
 model Patient {
-  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  incidentId            String?        @map("incident_id") @db.Uuid
-  demoId                String         @unique @map("demo_id") @db.VarChar(32)
-  firstName             String?        @map("first_name") @db.VarChar(64)
-  lastName              String?        @map("last_name") @db.VarChar(64)
-  estimatedAge          Int?           @map("estimated_age") @db.SmallInt
-  gender                Gender         @default(UNKNOWN)
-  status                PatientStatus  @default(FIELD_INTAKE)
-  currentTriageCategory TriageCategory @default(UNASSESSED) @map("current_triage_category")
-  chiefComplaint        String?        @map("chief_complaint") @db.Text
-  notes                 String?        @db.Text
-  version               Int            @default(1)
-  clientCreatedAt       DateTime       @map("client_created_at") @db.Timestamptz
-  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt             DateTime?      @map("deleted_at") @db.Timestamptz
+  id                        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentId                String?        @map("incident_id") @db.Uuid
+  demoId                    String         @unique @map("demo_id") @db.VarChar(32)
+  firstName                 String?        @map("first_name") @db.VarChar(64)
+  lastName                  String?        @map("last_name") @db.VarChar(64)
+  estimatedAge              Int?           @map("estimated_age") @db.SmallInt
+  gender                    Gender         @default(UNKNOWN)
+  status                    PatientStatus  @default(FIELD_INTAKE)
+  currentTriageCategory     TriageCategory @default(UNASSESSED) @map("current_triage_category")
+  currentTriageAssessmentId String?        @unique @map("current_triage_assessment_id") @db.Uuid
+  chiefComplaint            String?        @map("chief_complaint") @db.Text
+  notes                     String?        @db.Text
+  version                   Int            @default(1)
+  clientCreatedAt           DateTime       @map("client_created_at") @db.Timestamptz
+  createdAt                 DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt                 DateTime?      @map("deleted_at") @db.Timestamptz
 
   // Relations
-  incident              Incident?              @relation(fields: [incidentId], references: [id], onDelete: SetNull)
-  vitals                PatientVitalSign[]
-  media                 PatientMedia[]
-  triageAssessments     TriageAssessment[]
-  inventoryTransactions InventoryTransaction[]
+  incident                Incident?              @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  currentTriageAssessment TriageAssessment?      @relation("PatientCurrentAssessment", fields: [currentTriageAssessmentId], references: [id], onDelete: SetNull)
+  vitals                  PatientVitalSign[]
+  media                   PatientMedia[]
+  triageAssessments       TriageAssessment[]     @relation("PatientAssessmentHistory")
+  inventoryTransactions   InventoryTransaction[]
+  alerts                  Alert[]
 
   @@index([incidentId, status])
   @@index([currentTriageCategory, createdAt(sort: Asc)])
@@ -432,8 +440,13 @@ model TriageAssessment {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   patientId          String          @map("patient_id") @db.Uuid
   assessedBy         String          @map("assessed_by") @db.Uuid
-  canWalk            Boolean         @map("can_walk")
-  hasRespirations    Boolean         @map("has_respirations")
+  protocolCode       String          @default("START") @map("protocol_code") @db.VarChar(32)
+  protocolVersion    String          @default("1.0.0") @map("protocol_version") @db.VarChar(16)
+  careSetting        String          @default("PRE_HOSPITAL") @map("care_setting") @db.VarChar(32)
+  assessmentData     Json?           @map("assessment_data") @db.JsonB
+  decisionTrace      Json?           @map("decision_trace") @db.JsonB
+  canWalk            Boolean?        @map("can_walk")
+  hasRespirations    Boolean?        @map("has_respirations")
   respiratoryRate    Int?            @map("respiratory_rate") @db.SmallInt
   radialPulse        Boolean?        @map("radial_pulse")
   capillaryRefillSec Float?          @map("capillary_refill_sec") @db.Real
@@ -441,19 +454,18 @@ model TriageAssessment {
   calculatedCategory TriageCategory  @map("calculated_category")
   overriddenCategory TriageCategory? @map("overridden_category")
   overrideReason     String?         @map("override_reason") @db.Text
-  isCurrent          Boolean         @default(true) @map("is_current")
+  isCurrent          Boolean         @default(false) @map("is_current")
   assessmentSource   TriageSource    @default(FIELD_START) @map("assessment_source")
   assessedAt         DateTime        @map("assessed_at") @db.Timestamptz
   createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  patient  Patient @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  assessor User    @relation(fields: [assessedBy], references: [id], onDelete: Restrict)
+  patient           Patient  @relation("PatientAssessmentHistory", fields: [patientId], references: [id], onDelete: Restrict)
+  currentForPatient Patient? @relation("PatientCurrentAssessment")
+  assessor          User     @relation(fields: [assessedBy], references: [id], onDelete: Restrict)
 
-  // Note: Partial unique index enforced via SQL migration:
-  // CREATE UNIQUE INDEX uq_triage_assessments_current_patient ON triage_assessments(patient_id) WHERE is_current = true;
-  @@index([patientId, isCurrent])
-  @@index([assessedAt(sort: Desc)])
+  @@index([patientId, assessedAt(sort: Desc)])
+  @@index([protocolCode, protocolVersion])
   @@map("triage_assessments")
 }
 
@@ -510,13 +522,13 @@ model InventoryTransaction {
 model Notification {
   id         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   priority   NotificationPriority @default(LOW)
-  title      String   @db.VarChar(128)
-  body       String   @db.Text
-  category   String   @db.VarChar(64)
-  entityType String?  @map("entity_type") @db.VarChar(32)
-  entityId   String?  @map("entity_id") @db.Uuid
-  deepLink   String?  @map("deep_link") @db.VarChar(256)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  title      String               @db.VarChar(128)
+  body       String               @db.Text
+  category   String               @db.VarChar(64)
+  entityType String?              @map("entity_type") @db.VarChar(32)
+  entityId   String?              @map("entity_id") @db.Uuid
+  deepLink   String?              @map("deep_link") @db.VarChar(256)
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
   deliveries NotificationDelivery[]
@@ -615,4 +627,71 @@ model SyncHistory {
   @@index([deviceId, appliedAt(sort: Desc)])
   @@index([entityType, entityId])
   @@map("sync_history")
+}
+
+// ==========================================
+// 7. ALERTS (1 Model)
+// ==========================================
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  CLOSED
+
+  @@map("enum_alert_status")
+}
+
+enum AlertSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+
+  @@map("enum_alert_severity")
+}
+
+enum AlertType {
+  CLINICAL_DETERIORATION
+  MASS_CASUALTY_EVENT
+  CAPACITY_EXCEEDED
+  SECURITY_INCIDENT
+  SYSTEM_FAILURE
+  MANUAL_ALERT
+
+  @@map("enum_alert_type")
+}
+
+model Alert {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        AlertType
+  severity    AlertSeverity
+  title       String        @db.VarChar(128)
+  description String        @db.Text
+  status      AlertStatus   @default(OPEN)
+
+  patientId  String? @map("patient_id") @db.Uuid
+  incidentId String? @map("incident_id") @db.Uuid
+
+  createdBy  String? @map("created_by") @db.Uuid
+  assignedTo String? @map("assigned_to") @db.Uuid
+
+  idempotencyKey String? @unique @map("idempotency_key") @db.VarChar(128)
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  acknowledgedAt DateTime? @map("acknowledged_at") @db.Timestamptz
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz
+  closedAt       DateTime? @map("closed_at") @db.Timestamptz
+
+  patient  Patient?  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  creator  User?     @relation("AlertCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  assignee User?     @relation("AlertAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([status, severity, createdAt(sort: Desc)])
+  @@index([patientId])
+  @@index([incidentId])
+  @@index([assignedTo])
+  @@map("alerts")
 }

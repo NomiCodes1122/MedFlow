@@ -27,6 +27,7 @@ export class PatientService {
       gender: patient.gender,
       status: patient.status,
       currentTriageCategory: patient.currentTriageCategory,
+      currentTriageAssessmentId: (patient as any).currentTriageAssessmentId ?? null,
       chiefComplaint: patient.chiefComplaint,
       notes: patient.notes,
       version: patient.version,
@@ -104,7 +105,6 @@ export class PatientService {
       estimatedAge: input.estimatedAge ?? null,
       gender: input.gender,
       status: input.status,
-      currentTriageCategory: input.currentTriageCategory,
       chiefComplaint: input.chiefComplaint || null,
       notes: input.notes || null,
       clientCreatedAt,
@@ -228,8 +228,6 @@ export class PatientService {
     if (input.estimatedAge !== undefined) updateData.estimatedAge = input.estimatedAge;
     if (input.gender !== undefined) updateData.gender = input.gender;
     if (input.status !== undefined) updateData.status = input.status;
-    if (input.currentTriageCategory !== undefined)
-      updateData.currentTriageCategory = input.currentTriageCategory;
     if (input.chiefComplaint !== undefined) updateData.chiefComplaint = input.chiefComplaint;
     if (input.notes !== undefined) updateData.notes = input.notes;
 

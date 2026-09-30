@@ -8,6 +8,17 @@ export type ErrorCategory =
   | 'AUTHORIZATION'
   | 'VALIDATION';
 
+export type ConflictResolutionStrategy =
+  | 'KEEP_LOCAL'
+  | 'ACCEPT_SERVER'
+  | 'MANUAL_MERGE';
+
+export interface ConflictResolutionInput {
+  operationId: string;
+  strategy: ConflictResolutionStrategy;
+  mergedData?: Record<string, any>;
+}
+
 export interface SyncOperationResult {
   operationId: string;
   status: 'APPLIED' | 'DUPLICATE_IGNORED' | 'CONFLICT' | 'FAILED';
@@ -37,6 +48,7 @@ export interface ConflictReport {
   localPayload: Record<string, any>;
   serverVersion?: number;
   expectedVersion?: number;
+  serverState?: Record<string, any>;
   message: string;
   detectedAt: number;
 }

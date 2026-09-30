@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { UserRole, UserStatus } from '@prisma/client';
 import { createApp } from '../../app.js';
 import { prisma } from '../../database/prisma.js';
-import { FirebaseAuthService } from './firebase-auth.service.js';
+import { SupabaseAuthService } from './supabase-auth.service.js';
 import { TokenService } from './token.service.js';
 import { RefreshTokenService } from './refresh-token.service.js';
 import { requireAuthentication, requireRole, requireRoles } from './auth.middleware.js';
@@ -39,7 +39,7 @@ vi.mock('../../database/prisma.js', () => {
 describe('MedFlow Authentication & RBAC API Endpoints', () => {
   const mockParamedic = {
     id: '11111111-1111-1111-1111-111111111111',
-    firebaseUid: 'firebase-paramedic-001',
+    supabaseUid: 'firebase-paramedic-001',
     phone: '+15550100001',
     displayName: 'Sarah Connor (Lead Paramedic)',
     role: UserRole.PARAMEDIC,
@@ -51,7 +51,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
 
   const mockDoctor = {
     id: '22222222-2222-2222-2222-222222222222',
-    firebaseUid: 'firebase-doctor-001',
+    supabaseUid: 'firebase-doctor-001',
     phone: '+15550100002',
     displayName: 'Dr. Marcus Vance (ER Triage Lead)',
     role: UserRole.TRIAGE_DOCTOR,
@@ -63,7 +63,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
 
   const mockSuperintendent = {
     id: '33333333-3333-3333-3333-333333333333',
-    firebaseUid: 'firebase-super-001',
+    supabaseUid: 'firebase-super-001',
     phone: '+15550100003',
     displayName: 'Chief Elena Rostova (Hospital Superintendent)',
     role: UserRole.HOSPITAL_SUPERINTENDENT,
@@ -133,8 +133,8 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     });
 
     it('should establish session and issue credentials for active provisioned user', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockParamedic.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockParamedic.supabaseUid,
         phone: mockParamedic.phone,
       }));
 
@@ -155,8 +155,8 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     });
 
     it('should ignore client-provided role in body and derive role strictly from database', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockParamedic.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockParamedic.supabaseUid,
         phone: mockParamedic.phone,
       }));
 
@@ -176,14 +176,12 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     });
 
     it('should return 403 AUTH_USER_NOT_FOUND if user is unprovisioned', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
+      SupabaseAuthService.setCustomVerifier(async () => ({
         uid: 'unknown-uid',
         phone: '+15559999999',
       }));
 
-      vi.mocked(prisma.user.findUnique)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      vi.mocked(prisma.user.findUnique).mockResolvedValueOnce(null);
 
       const response = await request(testApp)
         .post('/api/v1/auth/session')
@@ -195,8 +193,8 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     });
 
     it('should return 403 AUTH_USER_INACTIVE if user is inactive', async () => {
-      FirebaseAuthService.setCustomVerifier(async () => ({
-        uid: mockParamedic.firebaseUid,
+      SupabaseAuthService.setCustomVerifier(async () => ({
+        uid: mockParamedic.supabaseUid,
       }));
 
       vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
@@ -286,7 +284,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     it('should revoke all user sessions when authenticated', async () => {
       const token = TokenService.signAccessToken({
         sub: mockParamedic.id,
-        firebaseUid: mockParamedic.firebaseUid,
+        supabaseUid: mockParamedic.supabaseUid,
         phone: mockParamedic.phone,
         role: mockParamedic.role,
         sessionId: mockSession.id,
@@ -310,7 +308,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     it('should return authenticated user profile', async () => {
       const token = TokenService.signAccessToken({
         sub: mockDoctor.id,
-        firebaseUid: mockDoctor.firebaseUid,
+        supabaseUid: mockDoctor.supabaseUid,
         phone: mockDoctor.phone,
         role: mockDoctor.role,
         sessionId: 'session-doc-01',
@@ -337,7 +335,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     it('should allow PARAMEDIC to access paramedic-only route', async () => {
       const paramedicToken = TokenService.signAccessToken({
         sub: mockParamedic.id,
-        firebaseUid: mockParamedic.firebaseUid,
+        supabaseUid: mockParamedic.supabaseUid,
         phone: mockParamedic.phone,
         role: UserRole.PARAMEDIC,
         sessionId: 'session-001',
@@ -357,7 +355,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     it('should deny PARAMEDIC from accessing doctor-only route with 403 AUTH_ROLE_REQUIRED', async () => {
       const paramedicToken = TokenService.signAccessToken({
         sub: mockParamedic.id,
-        firebaseUid: mockParamedic.firebaseUid,
+        supabaseUid: mockParamedic.supabaseUid,
         phone: mockParamedic.phone,
         role: UserRole.PARAMEDIC,
         sessionId: 'session-001',
@@ -377,7 +375,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     it('should allow HOSPITAL_SUPERINTENDENT to access command-only route', async () => {
       const superToken = TokenService.signAccessToken({
         sub: mockSuperintendent.id,
-        firebaseUid: mockSuperintendent.firebaseUid,
+        supabaseUid: mockSuperintendent.supabaseUid,
         phone: mockSuperintendent.phone,
         role: UserRole.HOSPITAL_SUPERINTENDENT,
         sessionId: 'session-super-01',
@@ -397,7 +395,7 @@ describe('MedFlow Authentication & RBAC API Endpoints', () => {
     it('should deny PARAMEDIC from command-only route with 403 AUTH_ROLE_REQUIRED', async () => {
       const paramedicToken = TokenService.signAccessToken({
         sub: mockParamedic.id,
-        firebaseUid: mockParamedic.firebaseUid,
+        supabaseUid: mockParamedic.supabaseUid,
         phone: mockParamedic.phone,
         role: UserRole.PARAMEDIC,
         sessionId: 'session-001',

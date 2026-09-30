@@ -44,7 +44,7 @@ vi.mock('../../database/prisma.js', () => {
 describe('Patient Domain API Integration Tests', () => {
   const mockParamedic = {
     id: '11111111-1111-1111-1111-111111111111',
-    firebaseUid: 'fb-paramedic-001',
+    supabaseUid: 'fb-paramedic-001',
     phone: '+15550100001',
     displayName: 'Sarah Connor (Lead Paramedic)',
     role: UserRole.PARAMEDIC,
@@ -54,7 +54,7 @@ describe('Patient Domain API Integration Tests', () => {
 
   const mockDoctor = {
     id: '22222222-2222-2222-2222-222222222222',
-    firebaseUid: 'fb-doctor-001',
+    supabaseUid: 'fb-doctor-001',
     phone: '+15550100002',
     displayName: 'Dr. Marcus Vance (ER Lead)',
     role: UserRole.TRIAGE_DOCTOR,
@@ -64,7 +64,7 @@ describe('Patient Domain API Integration Tests', () => {
 
   const mockSuperintendent = {
     id: '33333333-3333-3333-3333-333333333333',
-    firebaseUid: 'fb-super-001',
+    supabaseUid: 'fb-super-001',
     phone: '+15550100003',
     displayName: 'Chief Elena Rostova',
     role: UserRole.HOSPITAL_SUPERINTENDENT,
@@ -109,7 +109,7 @@ describe('Patient Domain API Integration Tests', () => {
 
   const paramedicToken = TokenService.signAccessToken({
     sub: mockParamedic.id,
-    firebaseUid: mockParamedic.firebaseUid,
+    supabaseUid: mockParamedic.supabaseUid,
     phone: mockParamedic.phone,
     role: mockParamedic.role,
     sessionId: 'session-paramedic',
@@ -117,7 +117,7 @@ describe('Patient Domain API Integration Tests', () => {
 
   const doctorToken = TokenService.signAccessToken({
     sub: mockDoctor.id,
-    firebaseUid: mockDoctor.firebaseUid,
+    supabaseUid: mockDoctor.supabaseUid,
     phone: mockDoctor.phone,
     role: mockDoctor.role,
     sessionId: 'session-doctor',
@@ -125,7 +125,7 @@ describe('Patient Domain API Integration Tests', () => {
 
   const superToken = TokenService.signAccessToken({
     sub: mockSuperintendent.id,
-    firebaseUid: mockSuperintendent.firebaseUid,
+    supabaseUid: mockSuperintendent.supabaseUid,
     phone: mockSuperintendent.phone,
     role: mockSuperintendent.role,
     sessionId: 'session-super',

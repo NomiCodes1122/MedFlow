@@ -3,6 +3,7 @@ import { NodeSqliteAdapter } from './sqlite.adapter.js';
 import { runMigrations } from './migrations/index.js';
 import { PatientLocalRepository } from './repositories/patient.repository.js';
 import { VitalsLocalRepository } from './repositories/vitals.repository.js';
+import { TriageLocalRepository } from './repositories/triage.repository.js';
 
 describe('Mobile SQLite Database & Migrations', () => {
   let db: NodeSqliteAdapter;
@@ -30,6 +31,7 @@ describe('Mobile SQLite Database & Migrations', () => {
     expect(tableNames).toContain('patient_vitals');
     expect(tableNames).toContain('outbox_operations');
     expect(tableNames).toContain('sync_metadata');
+    expect(tableNames).toContain('local_triage_assessments');
   });
 
   it('should insert and retrieve a local patient record', async () => {
@@ -142,4 +144,51 @@ describe('Mobile SQLite Database & Migrations', () => {
     expect(history[0].id).toBe('vital-002');
     expect(history[1].id).toBe('vital-001');
   });
+
+  it('should insert and retrieve local triage assessments chronologically', async () => {
+    const triageRepo = new TriageLocalRepository(db);
+    const now = Date.now();
+
+    await triageRepo.create({
+      id: 'local-asmt-001',
+      local_patient_id: 'local-pt-001',
+      protocol_code: 'START',
+      protocol_version: '1.0.0',
+      care_setting: 'PRE_HOSPITAL',
+      calculated_category: 'YELLOW',
+      assessment_source: 'FIELD_START',
+      assessed_at: now - 5000,
+      created_at: now - 5000,
+      sync_status: 'PENDING',
+    });
+
+    await triageRepo.create({
+      id: 'local-asmt-002',
+      local_patient_id: 'local-pt-001',
+      protocol_code: 'START',
+      protocol_version: '1.0.0',
+      care_setting: 'PRE_HOSPITAL',
+      calculated_category: 'RED',
+      assessment_source: 'FIELD_START',
+      assessed_at: now,
+      created_at: now,
+      sync_status: 'PENDING',
+    });
+
+    const assessments = await triageRepo.findByPatientId('local-pt-001');
+    expect(assessments).toHaveLength(2);
+    expect(assessments[0].id).toBe('local-asmt-002');
+    expect(assessments[0].calculated_category).toBe('RED');
+    expect(assessments[1].id).toBe('local-asmt-001');
+    expect(assessments[1].calculated_category).toBe('YELLOW');
+
+    const pending = await triageRepo.findPendingSync();
+    expect(pending).toHaveLength(2);
+
+    await triageRepo.markSynced('local-asmt-001');
+    const remainingPending = await triageRepo.findPendingSync();
+    expect(remainingPending).toHaveLength(1);
+    expect(remainingPending[0].id).toBe('local-asmt-002');
+  });
 });
+

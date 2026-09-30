@@ -8,7 +8,6 @@ export interface CreatePatientInput {
   estimatedAge?: number | null;
   gender?: Gender;
   status?: PatientStatus;
-  currentTriageCategory?: TriageCategory;
   chiefComplaint?: string | null;
   notes?: string | null;
   clientCreatedAt?: Date | string;
@@ -22,7 +21,6 @@ export interface UpdatePatientInput {
   estimatedAge?: number | null;
   gender?: Gender;
   status?: PatientStatus;
-  currentTriageCategory?: TriageCategory;
   chiefComplaint?: string | null;
   notes?: string | null;
 }
@@ -57,6 +55,7 @@ export interface PatientResponse {
   gender: Gender;
   status: PatientStatus;
   currentTriageCategory: TriageCategory;
+  currentTriageAssessmentId?: string | null;
   chiefComplaint: string | null;
   notes: string | null;
   version: number;

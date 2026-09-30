@@ -6,12 +6,13 @@ export type OutboxSyncStatus =
   | 'SYNCED'
   | 'FAILED'
   | 'CONFLICT'
-  | 'BLOCKED';
+  | 'BLOCKED'
+  | 'DISCARDED';
 
 export interface OutboxOperationRecord {
   operation_id: string;
   client_id: string;
-  entity_type: 'PATIENT' | 'OBSERVATION';
+  entity_type: 'PATIENT' | 'OBSERVATION' | 'TRIAGE' | 'ALERT' | 'NOTIFICATION';
   entity_id: string;
   operation_type: 'CREATE' | 'UPDATE' | 'DELETE';
   payload: string; // JSON string
@@ -198,5 +199,82 @@ export class OutboxRepository {
     return this.db.getAllAsync<OutboxOperationRecord>(
       `SELECT * FROM outbox_operations WHERE sync_status = 'CONFLICT' ORDER BY updated_at DESC`
     );
+  }
+
+  /**
+   * Resolves an outbox operation that is in CONFLICT state using an explicit strategy.
+   * Enforces safe state transitions: operation must exist and be in CONFLICT status.
+   */
+  async resolveConflict(
+    operationId: string,
+    strategy: 'KEEP_LOCAL' | 'ACCEPT_SERVER' | 'MANUAL_MERGE',
+    resolvedPayload?: Record<string, any>,
+    newBaseVersion?: number
+  ): Promise<void> {
+    const existing = await this.findById(operationId);
+    if (!existing) {
+      throw new Error(`Outbox operation '${operationId}' not found`);
+    }
+    if (existing.sync_status !== 'CONFLICT') {
+      throw new Error(
+        `Operation '${operationId}' is not in CONFLICT state (current: ${existing.sync_status})`
+      );
+    }
+
+    const now = Date.now();
+
+    if (strategy === 'ACCEPT_SERVER') {
+      // Discard client-side mutation safely
+      await this.db.runAsync(
+        `UPDATE outbox_operations
+         SET sync_status = 'DISCARDED', updated_at = ?
+         WHERE operation_id = ?`,
+        [now, operationId]
+      );
+      return;
+    }
+
+    if (strategy === 'KEEP_LOCAL') {
+      const baseVersion = newBaseVersion ?? existing.base_version;
+      const payloadObj = JSON.parse(existing.payload);
+      if (baseVersion !== undefined && baseVersion !== null) {
+        payloadObj.version = baseVersion;
+      }
+      await this.db.runAsync(
+        `UPDATE outbox_operations
+         SET sync_status = 'PENDING',
+             base_version = ?,
+             payload = ?,
+             retry_count = 0,
+             next_retry_at = NULL,
+             last_error_message = NULL,
+             conflict_details = NULL,
+             updated_at = ?
+         WHERE operation_id = ?`,
+        [baseVersion, JSON.stringify(payloadObj), now, operationId]
+      );
+      return;
+    }
+
+    if (strategy === 'MANUAL_MERGE') {
+      const baseVersion = newBaseVersion ?? existing.base_version;
+      const payloadObj = resolvedPayload || JSON.parse(existing.payload);
+      if (baseVersion !== undefined && baseVersion !== null) {
+        payloadObj.version = baseVersion;
+      }
+      await this.db.runAsync(
+        `UPDATE outbox_operations
+         SET sync_status = 'PENDING',
+             base_version = ?,
+             payload = ?,
+             retry_count = 0,
+             next_retry_at = NULL,
+             last_error_message = NULL,
+             conflict_details = NULL,
+             updated_at = ?
+         WHERE operation_id = ?`,
+        [baseVersion, JSON.stringify(payloadObj), now, operationId]
+      );
+    }
   }
 }

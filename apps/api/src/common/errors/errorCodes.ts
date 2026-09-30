@@ -21,6 +21,9 @@ export const ErrorCodes = {
   AUTH_REFRESH_TOKEN_REUSED: 'AUTH_REFRESH_TOKEN_REUSED',
   AUTH_FORBIDDEN: 'AUTH_FORBIDDEN',
   AUTH_ROLE_REQUIRED: 'AUTH_ROLE_REQUIRED',
+
+  // Clinical Triage (Phase 9)
+  CLINICAL_APPROVAL_PENDING: 'CLINICAL_APPROVAL_PENDING',
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

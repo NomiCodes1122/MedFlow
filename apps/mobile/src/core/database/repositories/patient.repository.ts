@@ -136,4 +136,40 @@ export class PatientLocalRepository {
       [Date.now(), localId, localId]
     );
   }
+
+  async resolveConflict(
+    localId: string,
+    updates: Partial<LocalPatientRecord>,
+    serverVersion: number
+  ): Promise<void> {
+    const fields: string[] = ['server_version = ?', 'updated_at = ?'];
+    const values: unknown[] = [serverVersion, Date.now()];
+
+    const allowedFields: (keyof LocalPatientRecord)[] = [
+      'first_name',
+      'last_name',
+      'estimated_age',
+      'gender',
+      'status',
+      'current_triage_category',
+      'chief_complaint',
+      'notes',
+      'incident_id',
+      'sync_status',
+      'is_dirty',
+    ];
+
+    for (const key of allowedFields) {
+      if (updates[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        values.push(updates[key]);
+      }
+    }
+
+    values.push(localId, localId);
+    await this.db.runAsync(
+      `UPDATE patients SET ${fields.join(', ')} WHERE local_id = ? OR server_id = ?`,
+      values
+    );
+  }
 }

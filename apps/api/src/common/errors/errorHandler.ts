@@ -15,20 +15,26 @@ export function errorHandler(
   const requestId = req.id;
 
   // 1. ApiError (Expected domain/operational errors)
-  if (err instanceof ApiError) {
-    if (err.statusCode >= 500) {
+  if (
+    err instanceof ApiError ||
+    (err instanceof Error &&
+      typeof (err as any).statusCode === 'number' &&
+      typeof (err as any).code === 'string')
+  ) {
+    const apiErr = err as ApiError;
+    if (apiErr.statusCode >= 500) {
       logger.error(
         { err, requestId, path: req.originalUrl, method: req.method },
-        `ApiError [${err.statusCode}] ${err.code}: ${err.message}`
+        `ApiError [${apiErr.statusCode}] ${apiErr.code}: ${apiErr.message}`
       );
     } else {
       logger.warn(
-        { requestId, code: err.code, details: err.details },
-        `ApiError [${err.statusCode}] ${err.code}: ${err.message}`
+        { requestId, code: apiErr.code, details: apiErr.details },
+        `ApiError [${apiErr.statusCode}] ${apiErr.code}: ${apiErr.message}`
       );
     }
 
-    ApiResponse.error(res, err.statusCode, err.code, err.message, requestId, err.details);
+    ApiResponse.error(res, apiErr.statusCode, apiErr.code, apiErr.message, requestId, apiErr.details);
     return;
   }
 

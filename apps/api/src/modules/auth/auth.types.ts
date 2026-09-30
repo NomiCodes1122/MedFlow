@@ -14,7 +14,7 @@ export interface SessionEstablishInput {
 
 export interface AccessTokenPayload {
   sub: string;
-  firebaseUid: string;
+  supabaseUid: string;
   phone: string;
   role: UserRole;
   sessionId: string;
@@ -59,7 +59,7 @@ export interface LogoutAllResult {
   revokedCount: number;
 }
 
-export interface FirebaseVerifiedUser {
+export interface SupabaseVerifiedUser {
   uid: string;
   phone?: string;
 }

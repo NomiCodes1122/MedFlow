@@ -1,5 +1,6 @@
 export * from './core/database/database.interface.js';
 export * from './core/database/sqlite.adapter.js';
+export * from './core/database/expo-sqlite.adapter.js';
 export * from './core/database/database.js';
 export * from './core/database/repositories/patient.repository.js';
 export * from './core/database/repositories/vitals.repository.js';
@@ -11,6 +12,10 @@ export * from './core/sync/sync.connectivity.js';
 export * from './core/sync/sync.store.js';
 export * from './core/sync/sync.worker.js';
 export * from './core/sync/sync.engine.js';
+export * from './core/device/device-identity.service.js';
+export * from './core/security/phi-crypto.service.js';
 export * from './core/api/secure-store.js';
 export * from './core/api/api.client.js';
 export * from './modules/patients/patient.service.js';
+export * from './modules/auth/auth.client.js';
+export * from './ui/index.js';
